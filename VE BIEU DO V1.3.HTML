@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Vẽ Biểu Đồ Địa Lý Trực Quan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+        
+        /* Containers */
+        .glass-card { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.03), 0 0 3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
+        .chart-container { position: relative; min-height: 480px; width: 100%; display: flex; flex-direction: column; justify-content: center; }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Form Controls */
+        .type-radio:checked + label { background-color: #4f46e5; color: white; border-color: #4f46e5; box-shadow: 0 4px 10px -2px rgba(79, 70, 229, 0.3); }
+        .type-radio-label { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        .modern-input { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.6rem 1rem; font-size: 0.875rem; font-weight: 600; color: #334155; transition: all 0.2s; outline: none; }
+        .modern-input:hover { background: #f1f5f9; }
+        .modern-input:focus { background: #ffffff; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+
+        .excel-cell { border: 1px solid transparent; background: transparent; width: 100%; padding: 0.5rem; text-align: center; border-radius: 6px; font-size: 0.875rem; font-weight: 600; color: #475569; transition: all 0.2s; outline: none; }
+        .excel-cell:hover { background: #f8fafc; border-color: #e2e8f0; }
+        .excel-cell:focus { background: #ffffff; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15); color: #0f172a; }
+
+        /* Pie Grid */
+        .pie-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); width: 100%; }
+        .pie-item { height: 320px; position: relative; background: #fafafa; border-radius: 12px; padding: 1rem; border: 1px solid #f1f5f9;}
+        
+        /* Buttons */
+        .btn-primary { background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); border: none; }
+        .btn-primary:hover { box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); transform: translateY(-1px); }
+        .btn-secondary { background: #ffffff; color: #475569; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+
+        /* Modal Animations */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 300ms, transform 300ms; }
+        .modal-leave { opacity: 1; transform: scale(1); }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); transition: opacity 300ms, transform 300ms; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center btn-primary">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <h1 class="font-extrabold text-xl tracking-tight text-slate-900">EduChart <span class="text-indigo-600">Pro</span></h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="resetData()" class="px-4 py-2 text-sm font-semibold rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 transition-all">Làm mới</button>
+                <button onclick="downloadWork()" class="px-5 py-2.5 text-sm font-bold rounded-xl btn-primary transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Xuất Báo Cáo (HD)
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 xl:grid-cols-12 gap-8">
+        
+        <!-- CỘT TRÁI: PANEL ĐIỀU KHIỂN -->
+        <div class="xl:col-span-4 space-y-6 flex flex-col">
+            
+            <!-- THÔNG TIN & LOẠI BIỂU ĐỒ -->
+            <section class="glass-card p-6">
+                <div class="flex items-center gap-2.5 mb-5">
+                    <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">1</div>
+                    <h2 class="font-bold text-lg text-slate-800">Cấu trúc biểu đồ</h2>
+                </div>
+                
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Đối tượng nghiên cứu</label>
+                        <input type="text" id="subjectInput" value="Việt Nam" oninput="scheduleUpdate()" class="modern-input" placeholder="VD: Hoa Kỳ, ASEAN...">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-widest">Dạng hiển thị</label>
+                            <button onclick="openChartGuideModal()" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors flex items-center gap-1 shadow-sm">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                Mẹo chọn biểu đồ
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div><input type="radio" name="chartType" id="type_combo" value="combo" class="hidden type-radio" checked onchange="handleTypeChange()"><label for="type_combo" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">KẾT HỢP</label></div>
+                            <div><input type="radio" name="chartType" id="type_grouped" value="grouped" class="hidden type-radio" onchange="handleTypeChange()"><label for="type_grouped" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">CỘT GHÉP</label></div>
+                            <div><input type="radio" name="chartType" id="type_stacked" value="stacked" class="hidden type-radio" onchange="handleTypeChange()"><label for="type_stacked" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">CỘT CHỒNG</label></div>
+                            <div><input type="radio" name="chartType" id="type_area" value="area" class="hidden type-radio" onchange="handleTypeChange()"><label for="type_area" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">MIỀN</label></div>
+                            <div><input type="radio" name="chartType" id="type_line" value="line" class="hidden type-radio" onchange="handleTypeChange()"><label for="type_line" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">ĐƯỜNG</label></div>
+                            <div><input type="radio" name="chartType" id="type_pie" value="pie" class="hidden type-radio" onchange="handleTypeChange()"><label for="type_pie" class="block text-center py-2 text-[11px] font-bold border border-slate-200 rounded-lg cursor-pointer text-slate-600 type-radio-label bg-white">TRÒN (CƠ CẤU)</label></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- QUẢN LÝ ĐẠI LƯỢNG -->
+            <section class="glass-card p-6 flex-grow flex flex-col max-h-[500px]">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">2</div>
+                        <h2 class="font-bold text-lg text-slate-800">Các Đại lượng</h2>
+                    </div>
+                    <button id="btnAddSeries" onclick="addSeries()" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">+ Thêm</button>
+                </div>
+
+                <div id="seriesList" class="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                    <!-- Danh sách thẻ đại lượng render ở đây -->
+                </div>
+            </section>
+
+        </div>
+
+        <!-- CỘT GIỮA & PHẢI: BẢNG DỮ LIỆU, BIỂU ĐỒ, NHẬN XÉT -->
+        <div class="xl:col-span-8 space-y-6 flex flex-col">
+            
+            <!-- BẢNG DỮ LIỆU (Nằm ngang để tiết kiệm không gian) -->
+            <section class="glass-card p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">3</div>
+                        <h2 class="font-bold text-lg text-slate-800">Bảng Số Liệu</h2>
+                    </div>
+                    <button onclick="addDataRow()" class="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors">+ Thêm Mốc Năm</button>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse min-w-max">
+                            <thead>
+                                <tr id="tableHeader" class="border-b border-slate-200 text-xs text-slate-500 uppercase font-bold tracking-wider bg-slate-100/50">
+                                    <!-- Tiêu đề cột render ở đây -->
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Hàng số liệu render ở đây -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VÙNG VẼ BIỂU ĐỒ -->
+            <section class="glass-card p-6 flex-grow flex flex-col">
+                <div id="chartWorkspace" class="chart-container flex-grow w-full flex flex-col justify-center items-center">
+                    <canvas id="mainChartCanvas"></canvas>
+                </div>
+            </section>
+
+            <!-- KHU VỰC NHẬN XÉT -->
+            <section class="glass-card p-6">
+                <h2 class="font-bold text-lg flex items-center gap-2 mb-5 text-slate-800">
+                    <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
+                    Phân Tích & Nhận Xét
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col h-full">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Gợi ý AI</span>
+                            <button onclick="copyToEditor()" class="text-[10px] font-bold text-indigo-600 uppercase hover:underline bg-indigo-50 px-2 py-1 rounded">Chép sang bài làm -></button>
+                        </div>
+                        <div id="autoAnalysisText" class="flex-grow p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed font-medium overflow-y-auto custom-scrollbar max-h-48"></div>
+                    </div>
+
+                    <div class="flex flex-col h-full">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bài làm của bạn</span>
+                        <textarea id="studentComment" class="flex-grow w-full h-48 p-4 bg-white border border-slate-200 rounded-xl text-sm leading-relaxed outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all resize-none" placeholder="Viết nhận xét hoàn chỉnh dựa trên biểu đồ và số liệu..."></textarea>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modal Hướng dẫn Chọn Biểu Đồ -->
+    <div id="chartGuideModal" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div id="chartGuideModalContent" class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] flex flex-col transform scale-95 transition-transform duration-300">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Kỹ năng nhận diện và chọn biểu đồ
+                </h3>
+                <button onclick="closeChartGuideModal()" class="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded-lg hover:bg-rose-50">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-grow bg-slate-100">
+                
+                <!-- Bảng kỹ năng thay thế cho ảnh -->
+                <div class="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-sm">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-indigo-50 text-indigo-800">
+                                <th class="p-4 border-b border-r border-indigo-100 w-1/4 font-extrabold text-base">Kỹ năng</th>
+                                <th class="p-4 border-b border-indigo-100 font-extrabold text-base">Nội dung</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-700 align-top">
+                            <tr class="border-b border-slate-200">
+                                <td class="p-4 border-r border-slate-200 font-bold text-slate-800 bg-slate-50">Nhận xét biểu đồ, bảng số liệu</td>
+                                <td class="p-4 space-y-2 leading-relaxed">
+                                    <p><span class="text-indigo-500 font-bold mr-1">-</span> <strong>Nhiều/ ít:</strong> dùng phép trừ</p>
+                                    <p><span class="text-indigo-500 font-bold mr-1">-</span> <strong>Nhanh/ chậm/ bao nhiêu lần:</strong> dùng phép chia</p>
+                                    <p><span class="text-indigo-500 font-bold mr-1">-</span> <strong>Chú ý câu hỏi giai đoạn:</strong> Đều/ Không đều, liên tục/ không liên tục.</p>
+                                    <p><span class="text-rose-500 font-bold mr-1">-</span> <strong>Giảm:</strong> Năm trước (chia/ trừ) năm sau.</p>
+                                    <p><span class="text-emerald-500 font-bold mr-1">-</span> <strong>Tăng:</strong> Năm sau (chia/ trừ) năm trước.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 border-r border-slate-200 font-bold text-slate-800 bg-slate-50">Nhận biết biểu đồ / Đọc nội dung (đặt tên) biểu đồ</td>
+                                <td class="p-0">
+                                    <div class="divide-y divide-slate-100">
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full bg-indigo-600"></span> Tròn:
+                                            </p>
+                                            <ul class="pl-4 space-y-1 mt-2">
+                                                <li>+ <strong>Thích hợp nhất:</strong> thời gian 1, 2, 3 năm / đơn vị % / Cơ cấu, tỉ trọng, quy mô và cơ cấu,...</li>
+                                                <li>+ <strong>Thích hợp:</strong> thời gian 1, 2, 3, 4 năm / đơn vị % / Cơ cấu, tỉ trọng, quy mô và cơ cấu, thay đổi cơ cấu,...</li>
+                                            </ul>
+                                        </div>
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-sm bg-indigo-600"></span> Miền:
+                                            </p>
+                                            <p class="pl-4 mt-1">Thời gian từ 4 năm trở lên / đơn vị % / chuyển dịch cơ cấu, chuyển dịch tỉ trọng, thay đổi cơ cấu, thay đổi tỉ trọng,...</p>
+                                        </div>
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <svg class="w-3 h-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg> Đường:
+                                            </p>
+                                            <ul class="pl-4 space-y-1 mt-2">
+                                                <li>+ <strong>Tuyệt đối:</strong> thời gian 4 năm trở lên / đơn vị nghìn USD, Tấn, triệu đồng... (không phải %) / Thay đổi sản lượng, thay đổi quy mô, tình hình phát triển,...</li>
+                                                <li>+ <strong>Tương đối:</strong> thời gian 4 năm trở lên / đơn vị % / Tốc độ tăng trưởng, tốc độ phát triển, tốc độ gia tăng....</li>
+                                            </ul>
+                                        </div>
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <span class="w-2 h-4 bg-indigo-600"></span> Cột:
+                                            </p>
+                                            <p class="pl-4 mt-1">Thời gian 1 năm hoặc nhiều năm cho các vùng kinh tế, tỉnh (tp), loại sản phẩm,... / đơn vị kg/người, người/km2, tạ/ha, USD/người, triệu tấn, nghìn ha... / thể hiện quy mô (diện tích, sản lượng, dân số....)</p>
+                                        </div>
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <span class="w-2 h-4 bg-indigo-600 border-t-2 border-white"></span> Cột chồng:
+                                            </p>
+                                            <p class="pl-4 mt-1">Đơn vị % / cơ cấu, tỉ trọng....</p>
+                                        </div>
+                                        <div class="p-4 hover:bg-slate-50 transition-colors">
+                                            <p class="font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                                                <span class="w-2 h-4 bg-indigo-600"></span><span class="w-2 h-2 rounded-full bg-rose-500 -ml-1 mt-2"></span> Biểu đồ kết hợp:
+                                            </p>
+                                            <p class="pl-4 mt-1">Thời gian chuỗi nhiều năm / 2 đơn vị khác nhau / thể hiện sự tương quan giữa độ lớn và động thái phát triển....</p>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+            <div class="p-4 border-t border-slate-200 text-center bg-white rounded-b-2xl">
+                <button onclick="closeChartGuideModal()" class="px-6 py-2 btn-primary rounded-xl text-sm font-bold">Đã hiểu & Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        let currentMode = 'combo'; 
+        let chartInstances = [];
+        
+        let state = {
+            subject: 'Việt Nam',
+            series: [
+                { id: 1, name: 'Công nghiệp', unit: '%', type: 'bar', axis: 'left', color: '#4f46e5', fill: false },
+                { id: 2, name: 'Nông nghiệp', unit: '%', type: 'bar', axis: 'left', color: '#10b981', fill: false },
+                { id: 3, name: 'Dịch vụ', unit: '%', type: 'line', axis: 'right', color: '#f43f5e', fill: false }
+            ],
+            data: [
+                { year: '2010', values: [35.5, 20.2, 44.3] },
+                { year: '2020', values: [42.1, 15.4, 42.5] }
+            ]
+        };
+
+        const COLOR_PALETTE = ['#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6', '#f43f5e', '#4f46e5'];
+
+        // Cấu hình mặc định cho Chart.js để tăng độ nét nội tại
+        Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+        Chart.defaults.color = '#64748b';
+        Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 3); // Force Super High Res internally
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            renderUI();
+            updateChart();
+        };
+
+        let updateTimeout;
+        function scheduleUpdate() {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => { updateChart(); }, 200);
+        }
+
+        // --- MODAL LOGIC ---
+        function openChartGuideModal() {
+            const modal = document.getElementById('chartGuideModal');
+            const content = document.getElementById('chartGuideModalContent');
+            modal.classList.remove('hidden');
+            // Trigger reflow
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+        }
+
+        function closeChartGuideModal() {
+            const modal = document.getElementById('chartGuideModal');
+            const content = document.getElementById('chartGuideModalContent');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300); // Wait for transition
+        }
+
+        // Đóng modal khi click ra ngoài
+        document.getElementById('chartGuideModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeChartGuideModal();
+            }
+        });
+
+        // --- LOGIC ---
+        function handleTypeChange() {
+            currentMode = document.querySelector('input[name="chartType"]:checked').value;
+            document.getElementById('btnAddSeries').style.display = (currentMode === 'pie') ? 'none' : 'block';
+
+            state.series.forEach((s, idx) => {
+                switch(currentMode) {
+                    case 'combo':
+                        s.type = idx < 2 ? 'bar' : 'line'; s.axis = idx < 2 ? 'left' : 'right'; s.fill = false;
+                        break;
+                    case 'grouped':
+                    case 'stacked':
+                        s.type = 'bar'; s.axis = 'left'; s.fill = false;
+                        break;
+                    case 'line':
+                        s.type = 'line'; s.axis = 'left'; s.fill = false;
+                        break;
+                    case 'area':
+                        s.type = 'line'; s.axis = 'left'; s.fill = true;
+                        break;
+                    case 'pie': break;
+                }
+            });
+
+            renderUI();
+            updateChart();
+        }
+
+        function addSeries() {
+            const newId = Date.now();
+            const color = COLOR_PALETTE[state.series.length % COLOR_PALETTE.length];
+            state.series.push({ id: newId, name: `Đại lượng ${state.series.length + 1}`, unit: '%', type: 'bar', axis: 'left', color: color, fill: false });
+            state.data.forEach(row => row.values.push(0));
+            renderUI(); updateChart();
+        }
+
+        function removeSeries(id) {
+            if (state.series.length <= 1) return;
+            const idx = state.series.findIndex(s => s.id === id);
+            state.series.splice(idx, 1);
+            state.data.forEach(row => row.values.splice(idx, 1));
+            renderUI(); updateChart();
+        }
+
+        function addDataRow() {
+            const lastYear = parseInt(state.data[state.data.length - 1]?.year) || 2020;
+            state.data.push({ year: (lastYear + 5).toString(), values: state.series.map(() => 0) });
+            renderUI(); updateChart();
+        }
+
+        function removeDataRow(idx) {
+            if (state.data.length <= 1) return;
+            state.data.splice(idx, 1);
+            renderUI(); updateChart();
+        }
+
+        // --- RENDER UI ---
+        function renderUI() {
+            renderSeriesList();
+            renderDataTable();
+        }
+
+        function renderSeriesList() {
+            const container = document.getElementById('seriesList');
+            container.innerHTML = state.series.map((s, idx) => `
+                <div class="bg-white border border-slate-200 p-3.5 rounded-xl flex flex-col gap-3 relative group transition-all hover:shadow-md hover:border-indigo-200">
+                    ${currentMode !== 'pie' ? `
+                    <button onclick="removeSeries(${s.id})" class="absolute -top-2.5 -right-2.5 w-6 h-6 bg-white border border-rose-200 text-rose-500 rounded-full flex items-center justify-center text-sm font-bold shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-50 z-10" title="Xóa đại lượng">&times;</button>
+                    ` : ''}
+                    
+                    <div class="flex gap-3 items-center">
+                        <div class="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shrink-0 cursor-pointer shadow-inner">
+                            <input type="color" value="${s.color}" onchange="state.series[${idx}].color = this.value; renderSeriesList(); updateChart();" class="absolute -top-2 -left-2 w-12 h-12 cursor-pointer border-0 p-0">
+                        </div>
+                        <div class="flex-grow grid grid-cols-2 gap-2">
+                            <input type="text" value="${s.name}" oninput="state.series[${idx}].name = this.value; renderDataTableHeader(); scheduleUpdate();" class="modern-input px-2 py-1.5 text-xs" placeholder="Tên">
+                            <input type="text" value="${s.unit}" oninput="state.series[${idx}].unit = this.value; scheduleUpdate();" class="modern-input px-2 py-1.5 text-xs font-normal" placeholder="Đơn vị">
+                        </div>
+                    </div>
+
+                    ${currentMode !== 'pie' ? `
+                    <div class="flex gap-2 pl-11">
+                        <select onchange="state.series[${idx}].type = this.value; updateChart();" class="flex-1 text-[11px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 focus:bg-white cursor-pointer">
+                            <option value="bar" ${s.type === 'bar' ? 'selected' : ''}>📊 Cột</option>
+                            <option value="line" ${s.type === 'line' ? 'selected' : ''}>📈 Đường</option>
+                        </select>
+                        <select onchange="state.series[${idx}].axis = this.value; updateChart();" class="flex-1 text-[11px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 focus:bg-white cursor-pointer">
+                            <option value="left" ${s.axis === 'left' ? 'selected' : ''}>Trục Trái</option>
+                            <option value="right" ${s.axis === 'right' ? 'selected' : ''}>Trục Phải</option>
+                        </select>
+                    </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderDataTableHeader() {
+            const header = document.getElementById('tableHeader');
+            header.innerHTML = `
+                <th class="p-3 w-28 text-center border-r border-slate-200">Mốc Năm</th>
+                ${state.series.map(s => `
+                    <th class="p-3 text-center border-r border-slate-200">
+                        <div class="truncate w-24 mx-auto text-slate-700" title="${s.name}">${s.name}</div>
+                        <div class="text-[10px] text-slate-400 font-normal mt-0.5">(${s.unit})</div>
+                    </th>
+                `).join('')}
+                <th class="p-3 w-10 text-center"></th>
+            `;
+        }
+
+        function renderDataTable() {
+            renderDataTableHeader();
+            const body = document.getElementById('dataTableBody');
+            body.innerHTML = state.data.map((row, rowIdx) => `
+                <tr class="hover:bg-indigo-50/40 transition-colors group">
+                    <td class="p-1.5 border-r border-slate-100">
+                        <input type="text" value="${row.year}" oninput="state.data[${rowIdx}].year = this.value; scheduleUpdate();" class="excel-cell bg-slate-50/50 text-slate-800">
+                    </td>
+                    ${row.values.map((val, colIdx) => `
+                    <td class="p-1.5 border-r border-slate-100">
+                        <input type="number" step="any" value="${val}" oninput="state.data[${rowIdx}].values[${colIdx}] = parseFloat(this.value) || 0; scheduleUpdate();" class="excel-cell">
+                    </td>
+                    `).join('')}
+                    <td class="p-1.5 text-center">
+                        <button onclick="removeDataRow(${rowIdx})" class="text-rose-300 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all" title="Xóa">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- RENDER CHART ---
+        function updateChart() {
+            const subject = document.getElementById('subjectInput').value || 'Đối Tượng';
+            const workspace = document.getElementById('chartWorkspace');
+            
+            chartInstances.forEach(c => c.destroy());
+            chartInstances = [];
+            workspace.innerHTML = '';
+
+            const labels = state.data.map(d => d.year);
+            if (labels.length === 0) return;
+
+            const leftUnits = [...new Set(state.series.filter(s => s.axis === 'left').map(s => s.unit))].join(', ');
+            const rightUnits = [...new Set(state.series.filter(s => s.axis === 'right').map(s => s.unit))].join(', ');
+
+            if (currentMode === 'pie') {
+                workspace.className = 'chart-container pie-grid';
+                
+                state.data.forEach((row, idx) => {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'pie-item flex flex-col';
+                    wrap.innerHTML = `<div class="flex-grow w-full relative"><canvas id="pie_${idx}"></canvas></div>`;
+                    workspace.appendChild(wrap);
+
+                    const ctx = document.getElementById(`pie_${idx}`).getContext('2d');
+                    const chart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: state.series.map(s => s.name),
+                            datasets: [{
+                                data: row.values,
+                                backgroundColor: state.series.map(s => s.color),
+                                borderWidth: 3, borderColor: '#ffffff',
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            layout: { padding: 10 },
+                            plugins: {
+                                title: { display: true, text: `Năm ${row.year} (${state.series[0].unit})`, font: { size: 16, weight: '800' }, padding: {bottom: 20}, color: '#0f172a' },
+                                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20, font: { weight: '600' } } },
+                                tooltip: { backgroundColor: 'rgba(15,23,42,0.9)', padding: 12, cornerRadius: 8, bodyFont: {weight: 'bold'} }
+                            }
+                        },
+                        plugins: [{
+                            id: 'pieLabels',
+                            afterDatasetsDraw(c) {
+                                const { ctx } = c;
+                                c.data.datasets.forEach((dataset, i) => {
+                                    const meta = c.getDatasetMeta(i);
+                                    meta.data.forEach((element, index) => {
+                                        const val = dataset.data[index];
+                                        if (val > 0) {
+                                            ctx.fillStyle = '#ffffff';
+                                            ctx.font = '800 13px "Plus Jakarta Sans"';
+                                            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                                            // Shadow for text readability
+                                            ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+                                            const position = element.tooltipPosition();
+                                            ctx.fillText(val, position.x, position.y);
+                                            ctx.shadowBlur = 0; // reset
+                                        }
+                                    });
+                                });
+                            }
+                        }]
+                    });
+                    chartInstances.push(chart);
+                });
+
+            } else {
+                workspace.className = 'chart-container flex-grow w-full';
+                const canvas = document.createElement('canvas');
+                canvas.id = 'mainChartCanvas';
+                workspace.appendChild(canvas);
+
+                const datasets = state.series.map((s, idx) => {
+                    const isLine = s.type === 'line';
+                    return {
+                        label: `${s.name} (${s.unit})`,
+                        data: state.data.map(row => row.values[idx]),
+                        type: s.type,
+                        yAxisID: s.axis === 'left' ? 'y' : 'y1',
+                        backgroundColor: s.type === 'bar' ? s.color : (s.fill ? s.color + '22' : 'transparent'), // Lighter fill for Area
+                        borderColor: s.color,
+                        borderWidth: isLine ? 3 : 0,
+                        borderRadius: s.type === 'bar' ? 6 : 0, // Rounded top for bars
+                        borderSkipped: false,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: s.color,
+                        pointBorderWidth: 2,
+                        pointRadius: isLine ? 5 : 0,
+                        pointHoverRadius: isLine ? 7 : 0,
+                        fill: s.fill,
+                        tension: s.fill ? 0.4 : 0, // Smooth area
+                        order: isLine ? 0 : 1 // Line on top
+                    };
+                });
+
+                const ctx = canvas.getContext('2d');
+                const chart = new Chart(ctx, {
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        layout: { padding: { top: 20 } },
+                        plugins: {
+                            title: { display: true, text: `BIỂU ĐỒ ${subject.toUpperCase()}`, font: { size: 22, weight: '800' }, color: '#0f172a', padding: { bottom: 30 } },
+                            legend: { position: 'bottom', labels: { usePointStyle: true, padding: 25, font: { size: 13, weight: '600' }, color: '#334155' } },
+                            tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', titleFont: { size: 14, weight: 'bold' }, bodyFont: { size: 13, weight: 'bold' }, padding: 14, cornerRadius: 10, boxPadding: 6 }
+                        },
+                        scales: {
+                            x: { 
+                                stacked: currentMode === 'stacked' || currentMode === 'area', 
+                                grid: { display: false },
+                                ticks: { font: { weight: '700' }, color: '#475569' }
+                            },
+                            y: {
+                                position: 'left',
+                                stacked: currentMode === 'stacked' || currentMode === 'area',
+                                beginAtZero: true,
+                                max: currentMode === 'area' ? 100 : undefined,
+                                grace: currentMode === 'area' ? '0%' : '20%',
+                                grid: { color: '#f1f5f9', drawBorder: false },
+                                title: { display: !!leftUnits, text: `Đơn vị: ${leftUnits}`, font: { style: 'italic', weight: '700' }, align: 'end', color: '#64748b' },
+                                ticks: { font: { weight: '600' }, color: '#64748b' }
+                            },
+                            y1: {
+                                position: 'right',
+                                display: state.series.some(s => s.axis === 'right'),
+                                beginAtZero: true,
+                                grace: '20%',
+                                grid: { display: false },
+                                title: { display: !!rightUnits, text: `Đơn vị: ${rightUnits}`, font: { style: 'italic', weight: '700' }, align: 'end', color: '#64748b' },
+                                ticks: { font: { weight: '600' }, color: '#64748b' }
+                            }
+                        }
+                    },
+                    plugins: [{
+                        id: 'customDataLabels',
+                        afterDatasetsDraw(c) {
+                            const { ctx } = c;
+                            c.data.datasets.forEach((dataset, i) => {
+                                const meta = c.getDatasetMeta(i);
+                                meta.data.forEach((element, index) => {
+                                    const val = dataset.data[index];
+                                    if (val !== 0) {
+                                        ctx.fillStyle = dataset.type === 'line' ? dataset.borderColor : '#334155';
+                                        ctx.font = '800 12px "Plus Jakarta Sans"';
+                                        ctx.textAlign = 'center';
+                                        ctx.textBaseline = 'bottom';
+                                        
+                                        // Adjust position for negatives or line vs bar
+                                        let yPos = element.y - (dataset.type === 'line' ? 10 : 6);
+                                        if (val < 0) yPos = element.y + 18; 
+
+                                        ctx.fillText(val, element.x, yPos);
+                                    }
+                                });
+                            });
+                        }
+                    }]
+                });
+                chartInstances.push(chart);
+            }
+
+            updateAutoAnalysis();
+        }
+
+        function updateAutoAnalysis() {
+            const years = state.data.map(d => d.year);
+            if (years.length < 2) {
+                document.getElementById('autoAnalysisText').innerHTML = "<span class='text-slate-400'>Cần ít nhất 2 mốc năm để phân tích xu hướng...</span>";
+                return;
+            }
+
+            let html = `<p class="mb-3">Phân tích giai đoạn <strong>${years[0]} - ${years[years.length-1]}</strong> của <strong>${document.getElementById('subjectInput').value}</strong>:</p><ul class="space-y-2">`;
+            
+            state.series.forEach((s, idx) => {
+                const vals = state.data.map(row => row.values[idx]);
+                const first = vals[0], last = vals[vals.length - 1];
+                const diff = last - first;
+                
+                let trendStr, colorClass, icon;
+                if (diff > 0) { trendStr = "Tăng"; colorClass = "text-emerald-600 bg-emerald-50"; icon = "↗"; }
+                else if (diff < 0) { trendStr = "Giảm"; colorClass = "text-rose-600 bg-rose-50"; icon = "↘"; }
+                else { trendStr = "Ổn định"; colorClass = "text-slate-600 bg-slate-100"; icon = "→"; }
+
+                html += `<li class="flex items-start gap-2">
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClass} mt-0.5">${icon} ${trendStr}</span>
+                    <span><strong>${s.name}</strong> thay đổi ${Math.abs(diff).toFixed(1)} ${s.unit} (từ ${first} thành ${last}).</span>
+                </li>`;
+            });
+            html += "</ul>";
+            document.getElementById('autoAnalysisText').innerHTML = html;
+        }
+
+        function copyToEditor() {
+            // Lấy text thuần (bỏ tags HTML)
+            const tmp = document.createElement('div');
+            tmp.innerHTML = document.getElementById('autoAnalysisText').innerHTML;
+            const text = tmp.innerText || tmp.textContent;
+            
+            const editor = document.getElementById('studentComment');
+            editor.value += (editor.value ? "\n\n" : "") + text.replace(/(\r\n|\n|\r)/gm, "\n");
+            editor.focus();
+        }
+
+        function resetData() {
+            if(confirm('Làm mới toàn bộ cài đặt?')) {
+                state.subject = 'Việt Nam';
+                state.series = [
+                    { id: 1, name: 'Công nghiệp', unit: '%', type: 'bar', axis: 'left', color: '#4f46e5', fill: false },
+                    { id: 2, name: 'Nông nghiệp', unit: '%', type: 'bar', axis: 'left', color: '#10b981', fill: false },
+                    { id: 3, name: 'Dịch vụ', unit: '%', type: 'line', axis: 'right', color: '#f43f5e', fill: false }
+                ];
+                state.data = [{ year: '2010', values: [35.5, 20.2, 44.3] }, { year: '2020', values: [42.1, 15.4, 42.5] }];
+                document.getElementById('subjectInput').value = 'Việt Nam';
+                document.getElementById('studentComment').value = '';
+                document.getElementById('type_combo').click(); 
+            }
+        }
+
+        // --- XUẤT ẢNH SIÊU NÉT (HIGH-RESOLUTION EXPORT) ---
+        function downloadWork() {
+            const workspace = document.getElementById('chartWorkspace');
+            const comment = document.getElementById('studentComment').value;
+            const subject = document.getElementById('subjectInput').value || 'Báo Cáo';
+            
+            // 1. Thiết lập Canvas và hệ số Scale (x2 để siêu nét)
+            const SCALE = 2; 
+            const exportCanvas = document.createElement('canvas');
+            const ctx = exportCanvas.getContext('2d');
+            
+            // Kích thước logic (CSS pixels)
+            const LOGICAL_WIDTH = 1200;
+            const PADDING = 60;
+            
+            // 2. Tính toán chiều cao không gian vẽ biểu đồ (Logic)
+            let logicalChartHeight = 0;
+            const canvases = workspace.querySelectorAll('canvas');
+            if (currentMode === 'pie') {
+                logicalChartHeight = Math.ceil(canvases.length / 2) * 450; 
+            } else {
+                logicalChartHeight = 650; // Rộng rãi hơn
+            }
+
+            // 3. Xử lý Wrap Text cho nhận xét (Tính trên không gian logic)
+            ctx.font = "500 18px 'Plus Jakarta Sans'"; // Dùng font nhỏ để đo lường trong không gian logic
+            const wrapWidth = LOGICAL_WIDTH - (PADDING * 2);
+            const lines = [];
+            
+            if (comment.trim() !== '') {
+                const paragraphs = comment.split('\n');
+                paragraphs.forEach(p => {
+                    const words = p.split(' ');
+                    let currentLine = '';
+                    words.forEach(word => {
+                        const testLine = currentLine + word + ' ';
+                        if (ctx.measureText(testLine).width > wrapWidth && currentLine !== '') {
+                            lines.push(currentLine);
+                            currentLine = word + ' ';
+                        } else {
+                            currentLine = testLine;
+                        }
+                    });
+                    lines.push(currentLine);
+                });
+            }
+
+            // 4. Kích thước vật lý thực tế của Canvas xuất
+            const logicalCommentHeight = lines.length > 0 ? (lines.length * 36) + 120 : 0;
+            const LOGICAL_HEIGHT = logicalChartHeight + logicalCommentHeight + 160; 
+            
+            exportCanvas.width = LOGICAL_WIDTH * SCALE;
+            exportCanvas.height = LOGICAL_HEIGHT * SCALE;
+            
+            // Áp dụng scale cho toàn bộ Context
+            ctx.scale(SCALE, SCALE);
+            ctx.textBaseline = 'top';
+
+            // --- BẮT ĐẦU VẼ TỪ ĐÂY (Dùng tọa độ Logic) ---
+            
+            // Background Trắng
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+            // Header Tờ Giấy
+            ctx.fillStyle = '#0f172a';
+            ctx.font = "800 36px 'Plus Jakarta Sans'";
+            ctx.textAlign = "center";
+            ctx.fillText(`BÁO CÁO PHÂN TÍCH: ${subject.toUpperCase()}`, LOGICAL_WIDTH / 2, PADDING);
+            
+            // Đường kẻ dưới Header
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(PADDING, 120); ctx.lineTo(LOGICAL_WIDTH - PADDING, 120); ctx.stroke();
+
+            // Vẽ Biểu Đồ (Canvas nguồn đã có độ phân giải nội tại rất cao nhờ devicePixelRatio = 3)
+            // Lệnh drawImage sẽ lấy canvas nguồn và ép vào kích thước logic, sau đó bộ nhân SCALE sẽ nội suy nó ra pixel vật lý sắc nét.
+            if (currentMode === 'pie') {
+                canvases.forEach((c, i) => {
+                    const row = Math.floor(i / 2);
+                    const col = i % 2;
+                    const x = col * (LOGICAL_WIDTH / 2) + PADDING;
+                    const y = row * 450 + 160;
+                    ctx.drawImage(c, x, y, (LOGICAL_WIDTH / 2) - PADDING*1.5, 400);
+                });
+            } else {
+                ctx.drawImage(canvases[0], PADDING, 160, LOGICAL_WIDTH - PADDING*2, 600);
+            }
+
+            // Vẽ Nhận Xét
+            if (lines.length > 0) {
+                let yText = logicalChartHeight + 180;
+                
+                // Khung background cho nhận xét
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                ctx.roundRect(PADDING, yText - 30, LOGICAL_WIDTH - PADDING*2, logicalCommentHeight, 16);
+                ctx.fill();
+
+                // Tiêu đề nhận xét
+                ctx.textAlign = "left";
+                ctx.fillStyle = '#4f46e5';
+                ctx.font = "800 24px 'Plus Jakarta Sans'";
+                ctx.fillText("NHẬN XÉT CHI TIẾT", PADDING + 40, yText + 10);
+                
+                // Text body
+                yText += 60;
+                ctx.font = "500 20px 'Plus Jakarta Sans'";
+                ctx.fillStyle = "#334155";
+                lines.forEach(l => { 
+                    ctx.fillText(l, PADDING + 40, yText); 
+                    yText += 36; 
+                });
+            }
+
+            // --- TẠO FILE TẢI VỀ ---
+            const link = document.createElement('a');
+            link.download = `Bao-Cao-${subject.replace(/\s+/g, '-')}-HighRes.png`;
+            // Sử dụng chất lượng 1.0 (tốt nhất)
+            link.href = exportCanvas.toDataURL('image/png', 1.0);
+            link.click();
+        }
+    </script>
+</body>
+</html>
